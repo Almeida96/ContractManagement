@@ -1,24 +1,20 @@
-﻿using FluentValidation;
-using ContractManagement.Models; // Certifique-se de ajustar o namespace conforme o seu projeto
+using FluentValidation;
+using ContractManagement.Models;
 
-namespace ContractManagement.Validators // Certifique-se de usar o namespace correto do seu projeto
+namespace ContractManagement.Validators;
+
+public class ContratoValidator : AbstractValidator<Contrato>
 {
-    public class ContratoValidator : AbstractValidator<Contrato>
+    public ContratoValidator()
     {
-        public ContratoValidator()
-        {
-            RuleFor(x => x.Empresa)
-                .NotEmpty().WithMessage("A empresa é obrigatória.");
-
-            RuleFor(x => x.ParteEnvolvida)
-                .NotEmpty().WithMessage("A parte envolvida é obrigatória.");
-
-            RuleFor(x => x.DataInicio)
-                .LessThan(x => x.DataFim)
-                .WithMessage("A data de início deve ser anterior à data de término.");
-
-            RuleFor(x => x.Valor)
-                .GreaterThan(0).WithMessage("O valor do contrato deve ser maior que zero.");
-        }
+        RuleFor(x => x.Empresa).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.ParteEnvolvida).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.DataInicio).GreaterThanOrEqualTo(new DateTime(1900, 1, 1)).LessThan(x => x.DataFim);
+        RuleFor(x => x.DataFim).LessThan(new DateTime(9998, 1, 1));
+        RuleFor(x => x.Valor).GreaterThan(0).LessThanOrEqualTo(9999999999.99m).PrecisionScale(12, 2, false);
+        RuleFor(x => x.Status).Must(value => new[] { "ativo", "cancelado", "encerrado" }.Contains(value))
+            .WithMessage("Status must be ativo, cancelado or encerrado.");
+        RuleFor(x => x.Periodicidade).NotEmpty().MaximumLength(30);
+        RuleFor(x => x.Documento).MaximumLength(2048);
     }
 }

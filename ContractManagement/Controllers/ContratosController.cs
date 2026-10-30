@@ -22,10 +22,11 @@ namespace ContractManagement.Controllers
 
         // GET: api/contratos
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Contrato>>> GetContratos()
+        public async Task<ActionResult<IEnumerable<Contrato>>> GetContratos(int offset = 0, int limit = 50)
         {
             // Retorna a lista de contratos do banco de dados
-            return await _context.Contratos.ToListAsync();
+            if (offset < 0 || limit < 1 || limit > 200) return BadRequest("Use offset >= 0 and limit between 1 and 200.");
+            return await _context.Contratos.AsNoTracking().OrderBy(c => c.Id).Skip(offset).Take(limit).ToListAsync();
         }
 
         // GET: api/contratos/5
@@ -49,6 +50,7 @@ namespace ContractManagement.Controllers
         [HttpPost]
         public async Task<ActionResult<Contrato>> PostContrato(Contrato contrato)
         {
+            if (contrato.Id != 0) return BadRequest("The server assigns contract IDs.");
             // Adiciona o novo contrato ao contexto do banco de dados
             _context.Contratos.Add(contrato);
             await _context.SaveChangesAsync();

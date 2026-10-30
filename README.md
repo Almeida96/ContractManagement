@@ -1,190 +1,78 @@
+# Contract Management API
 
-# Contract Management System - Documentation
+An ASP.NET Core API for a shared contract register: authenticated CRUD, validated dates and amounts, and optional annual renewal jobs. The original Portuguese route and field names remain supported.
 
-## Overview
+## Run locally
 
-This project is a **Contract Management System** for companies, built with **ASP.NET Core**. It allows businesses to manage contracts with suppliers, clients, and partners. The main features include:
+Install the .NET 8 SDK. SQLite is the default; its database is created on first startup. Configure one local demo account and a signing key before launching.
 
-- **JWT Authentication**: Protects API endpoints, ensuring that only authenticated users can perform sensitive operations.
-- **Automatic Contract Renewal**: Contracts can be automatically renewed when they are about to expire.
-- **Contract CRUD**: Create, read, update, and delete contracts via API.
-- **Dashboard and Reports**: Supports contract viewing by status, date, and renewal periods.
-- **Swagger UI**: Provides a graphical interface for testing and interacting with the API.
+PowerShell:
 
-## Features
-
-- **JWT Authentication**: Users can log in and receive a JWT token that allows access to protected API endpoints.
-- **Automatic Renewal**: Contracts with the auto-renewal option enabled will be automatically renewed when they are about to expire.
-- **CRUD Operations for Contracts**: Allows creating, reading, updating, and deleting contracts via API.
-- **Scheduled Tasks with Hangfire**: Uses Hangfire to automatically renew contracts daily.
-- **Protected Endpoints with `[Authorize]`**: Only authenticated users can access protected API endpoints.
-- **Swagger Integration**: Allows you to view and test the API via Swagger.
-
-## Requirements
-
-- **.NET 6 or later**
-- **SQL Server** (or LocalDB for development)
-- **Visual Studio 2022** or any compatible .NET IDE
-- **NuGet Packages**:
-  - `Microsoft.EntityFrameworkCore`
-  - `Microsoft.EntityFrameworkCore.SqlServer`
-  - `Microsoft.EntityFrameworkCore.Tools`
-  - `Microsoft.AspNetCore.Authentication.JwtBearer`
-  - `FluentValidation.AspNetCore`
-  - `Hangfire`
-  - `Swashbuckle.AspNetCore` (for Swagger)
-
-## Installation and Configuration
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/Almeida96/ContractManagement.git
+```powershell
+$env:Auth__Key = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:Auth__Username = "admin"
+$env:Auth__Password = Read-Host "Local demo password (12 to 128 characters)"
+dotnet run --project ContractManagement --launch-profile http
 ```
 
-### 2. Configure the Connection String
+On Bash, use `export Auth__Key="$(openssl rand -base64 32)"`, `export Auth__Username=admin`, and `read -rs Auth__Password; export Auth__Password` before the same run command.
 
-In the `appsettings.json` file, configure the connection string for your SQL Server database:
+The API listens on `http://localhost:5012`; development OpenAPI is at `/swagger`. Startup fails if the signing key is shorter than 32 UTF-8 bytes or the account configuration is missing. Never commit these values.
+
+## API
+
+First request `POST /api/auth/login` with `{"username":"admin","password":"your configured password"}`. The response contains `token` and `expiresAt`. Send `Authorization: Bearer TOKEN` on contract requests.
+
+| Method and route | Result |
+| --- | --- |
+| `GET /api/contratos?offset=0&limit=50` | Contracts ordered by ID; limit 1–200 |
+| `GET /api/contratos/{id}` | One contract, or 404 |
+| `POST /api/contratos` | 201 and a Location header; omit the ID |
+| `PUT /api/contratos/{id}` | Replace a contract; body ID must match the route |
+| `DELETE /api/contratos/{id}` | 204, or 404 |
+
+Example creation body:
 
 ```json
 {
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\mssqllocaldb;Database=ContractManagementDb;Trusted_Connection=True;"
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*"
-}
-```
-
-### 3. Install Dependencies
-
-Run the following command to restore the **NuGet** packages:
-
-```bash
-dotnet restore
-```
-
-### 4. Apply Migrations and Update the Database
-
-Run the following command to apply the migrations and create the database:
-
-```bash
-dotnet ef database update
-```
-
-### 5. Run the Application
-
-After configuration, you can run the application with:
-
-```bash
-dotnet run
-```
-
-The API will be available at `http://localhost:{PORT}`.
-
-## How JWT Authentication Works
-
-The system uses **JWT (JSON Web Token)** for authentication. Here's how it works:
-
-1. **User Login**: The user provides their credentials (username and password) to the `/api/Auth/login` endpoint. If the credentials are valid, a **JWT token** is generated and returned in the response.
-
-2. **Token Usage**: The token must be included in the **Authorization header** of all subsequent requests to protected endpoints. The format is:
-
-   ```
-   Authorization: Bearer {your_jwt_token}
-   ```
-
-3. **Token Validation**: The server validates the token on each request. If the token is valid and not expired, the request is processed. Otherwise, a **401 Unauthorized** error is returned.
-
-4. **Token Expiration**: JWT tokens have an expiration time (`exp` claim). If the token is used after its expiration time, it will be considered invalid, and you will need to log in again to obtain a new token.
-
-### Example of Token Usage:
-
-- **Login Request**:
-
-```json
-{
-  "username": "admin",
-  "password": "password"
-}
-```
-
-- **Using the Token in Subsequent Requests**:
-
-Once you have the token, include it in the headers as follows:
-
-```bash
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkbWluIiwibmJmIjoxNzI2ODU3MTAwLCJleHAiOjE3MjY4NjQzMDAsImlhdCI6MTcyNjg1NzEwMH0.rm9LytMbAsWS7I2iH0D51NmN9wNR9phvfgSpJUr--Vs
-```
-
-#### Example cURL Request to Create a Contract:
-
-```bash
-curl -X POST   'https://localhost:7219/api/Contratos'   -H 'accept: text/plain'   -H 'Authorization: Bearer {your_jwt_token}'   -H 'Content-Type: application/json'   -d '{
-  "id": 0,
-  "empresa": "Amazon",
-  "parteEnvolvida": "Contrato x",
-  "dataInicio": "2024-09-20",
-  "dataFim": "2025-09-20",
-  "valor": 5000,
-  "periodicidade": "mensal",
+  "empresa": "Example Ltd",
+  "parteEnvolvida": "Supplier",
+  "dataInicio": "2026-01-01",
+  "dataFim": "2027-01-01",
+  "valor": 1200.50,
+  "periodicidade": "anual",
   "status": "ativo",
-  "documento": "contrato_123.pdf",
+  "documento": "",
   "renovacaoAutomatica": true
-}'
+}
 ```
 
-Ensure you replace `{your_jwt_token}` with the actual token you received after logging in.
+Dates are returned as `yyyy-MM-dd`; legacy `dd-MM-yyyy` input is also accepted. The end must follow the start. Amounts must be positive, with at most two decimal places and a maximum of 9,999,999,999.99. Status is `ativo`, `cancelado` or `encerrado`. Invalid bodies return 400; missing or invalid tokens return 401. Login has a shared limit of ten attempts per minute and returns 429 above it.
 
-### Important Notes:
+## Storage and scheduled renewals
 
-- The token has a limited lifetime. After it expires, you will need to log in again to get a new token.
-- The token should be passed in the **Authorization** header for all requests to protected routes.
+The default `ContractManagement/contracts.db` is a local SQLite database, configured by `ConnectionStrings__Sqlite`. Back it up before changing schema. SQLite uses `EnsureCreated` for a new demo database; it does not apply the historical SQL Server migrations or upgrade an existing SQLite schema.
 
-## API Documentation
+For SQL Server, set `Database__UseSqlite=false` and `ConnectionStrings__DefaultConnection`, then apply the checked-in migrations with the .NET EF 8 tool:
 
-### Authentication (JWT)
+```sh
+dotnet ef database update --project ContractManagement
+```
 
-To access protected endpoints, you first need to log in and obtain a JWT token.
+Set `Jobs__Enabled=true` only for SQL Server. Hangfire runs one worker server and schedules the renewal job daily at 09:00 UTC. No public Hangfire dashboard is exposed.
 
-- **POST /api/auth/login**
+Renewal selects automatic contracts with status `ativo` whose end date falls between today and seven days ahead, inclusive. It moves the start to the previous end and adds one year to the end. Cancelled and already expired contracts are skipped. Re-running the job leaves the new term unchanged. `periodicidade` records billing cadence; this demo's renewal term is always one year.
 
-  Send a JSON object with the user's credentials:
+## Tests
 
-  ```json
-  {
-    "username": "admin",
-    "password": "password"
-  }
-  ```
+```sh
+dotnet test ContractManagement.Tests/ContractManagement.Tests.csproj
+```
 
-  **Response**:
+HTTP integration tests use temporary SQLite databases. They check issued-token access, CRUD, invalid contracts, pagination and renewal eligibility/idempotence. SQL Server deployment and Hangfire scheduling require a separate configured SQL Server instance and are not covered by the SQLite tests.
 
-  ```json
-  {
-    "token": "your_jwt_token"
-  }
-  ```
+## Scope
 
-- Use the JWT token returned to authorize your requests in Swagger and for protected endpoints. Click **Authorize** in the Swagger UI and input the token in the format:
+This is a single-account demonstration. Every authenticated request sees the same register. There is no tenant isolation, user registration, document upload, approval workflow or reporting dashboard. `documento` is a text reference, not uploaded file storage. Authentication and contract data need a managed identity provider, durable secret storage, HTTPS and a deployment-specific backup policy before multi-user use.
 
-  ```
-  Bearer {your_jwt_token}
-  ```
-
-## Contributing
-
-Contributions are welcome! Follow the steps below to contribute:
-
-1. **Fork** this repository.
-2. Create a branch for your feature (`git checkout -b my-feature`).
-3. Commit your changes (`git commit -am 'Add new feature'`).
-4. Push to the branch (`git push origin my-feature`).
-5. Open a **Pull Request**.
-
----
+[Contribution notes](CONTRIBUTING.md) · [Changes](CHANGELOG.md)
